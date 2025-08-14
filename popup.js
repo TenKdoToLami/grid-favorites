@@ -26,7 +26,9 @@ function createTileContent(item) {
     icon.className = `tile-icon ${isBookmark ? "favicon" : "folder-icon"}`;
     if (isBookmark) {
         icon.src = `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(item.url)}&size=32`;
-        icon.onerror = () => { icon.src = DEFAULT_ICON_URL; };
+        icon.onerror = () => {
+            icon.src = DEFAULT_ICON_URL;
+        };
         icon.loading = "lazy";
     } else {
         const initials = (item.title || "F").replace(/^[^a-zA-Z0-9]+/, '').substring(0, 2).toUpperCase() || "F";
@@ -97,9 +99,9 @@ function createCollapseTile(parentFolderEl) {
     collapseLi.dataset.collapseTargetId = getBookmarkId(parentFolderEl);
 
     collapseLi.innerHTML = `
-        <div class="tile-icon collapse-icon" title="Collapse Folder">&lt;</div>
-        <span class="tile-title collapse-title">Collapse</span>
-    `;
+    <div class="tile-icon collapse-icon" title="Collapse Folder">&lt;</div>
+    <span class="tile-title collapse-title">Collapse</span>
+  `;
 
     // Match the border color of the nested folder it belongs to
     if (parentFolderEl.classList.contains('nested-folder')) {
@@ -197,16 +199,17 @@ function closeFolder(folderEl) {
 
 
 // --- Event Handlers ---
-
 document.addEventListener('DOMContentLoaded', refreshBookmarksList);
 
-document.getElementById('favorites-list').addEventListener('click', (e) => {
-    const tile = e.target.closest('.tile');
-    if (!tile || draggedElement) return; // Ignore clicks during a drag operation
 
-    // Handle Delete Button
+document.getElementById('favorites-list').addEventListener('mousedown', (e) => {
+    const tile = e.target.closest('.tile');
+    if (!tile || draggedElement) return;
+
+    // Handle Delete Button for any mouse button
     if (e.target.closest('.delete-button')) {
         e.stopPropagation();
+        e.preventDefault(); // Prevent tile click from also firing
         const id = e.target.closest('[data-delete-id]').dataset.deleteId;
         const isFolderType = e.target.closest('[data-is-folder]').dataset.isFolder === 'true';
         const title = tile._itemData.title || (isFolderType ? 'folder' : 'bookmark');
@@ -217,38 +220,49 @@ document.getElementById('favorites-list').addEventListener('click', (e) => {
                 if (chrome.runtime.lastError) {
                     alert(`Could not delete item: ${chrome.runtime.lastError.message}`);
                 } else {
-                    refreshBookmarksList(); // Easiest way to sync state
+                    refreshBookmarksList();
                 }
             });
         }
         return;
     }
 
-    // Handle Collapse Tile
-    if (isCollapseTile(tile)) {
-        const targetId = tile.dataset.collapseTargetId;
-        const folderToCollapse = document.querySelector(`.tile.folder[data-id='${targetId}']`);
-        if (folderToCollapse) closeFolder(folderToCollapse);
-        return;
-    }
-
-    // Handle Folder Toggle
-    if (isFolder(tile)) {
-        tile.classList.contains('open') ? closeFolder(tile) : openFolder(tile);
-    }
-    // Handle Bookmark Click (if not clicking the link itself)
-    else if (e.target.tagName !== 'A') {
-        tile.querySelector('a.tile-title')?.click();
+    // Handle all other tile actions based on mouse button
+    if (e.button === 0) { // Left-click
+        if (isCollapseTile(tile)) {
+            const targetId = tile.dataset.collapseTargetId;
+            const folderToCollapse = document.querySelector(`.tile.folder[data-id='${targetId}']`);
+            if (folderToCollapse) closeFolder(folderToCollapse);
+        } else if (isFolder(tile)) {
+            tile.classList.contains('open') ? closeFolder(tile) : openFolder(tile);
+        } else if (!!tile._itemData.url) {
+            const url = tile._itemData.url;
+            chrome.tabs.update({
+                url
+            });
+            window.close(); // Close the popup
+        }
+    } else if (e.button === 1) { // Middle-click
+        e.preventDefault(); // Prevent browser's default middle-click behavior
+        if (!!tile._itemData.url) {
+            const url = tile._itemData.url;
+            chrome.tabs.create({
+                url
+            });
+        }
     }
 });
-
 document.getElementById('add-bookmark-btn').addEventListener('click', () => {
     const url = prompt("Enter bookmark URL:", "https://");
     if (!url || url.trim() === "https://") return;
     const title = prompt("Enter bookmark title (optional):", "");
     if (title === null) return; // User cancelled
 
-    chrome.bookmarks.create({ parentId: BOOKMARKS_BAR_ID, title: title.trim() || url, url }, () => {
+    chrome.bookmarks.create({
+        parentId: BOOKMARKS_BAR_ID,
+        title: title.trim() || url,
+        url
+    }, () => {
         if (chrome.runtime.lastError) alert(`Error: ${chrome.runtime.lastError.message}`);
         else refreshBookmarksList();
     });
@@ -261,14 +275,16 @@ document.getElementById('add-folder-btn').addEventListener('click', () => {
         return;
     };
 
-    chrome.bookmarks.create({ parentId: BOOKMARKS_BAR_ID, title: title.trim() }, () => {
+    chrome.bookmarks.create({
+        parentId: BOOKMARKS_BAR_ID,
+        title: title.trim()
+    }, () => {
         if (chrome.runtime.lastError) alert(`Error: ${chrome.runtime.lastError.message}`);
         else refreshBookmarksList();
     });
 });
 
 
-// --- Drag & Drop Handlers ---
 
 const list = document.getElementById('favorites-list');
 
@@ -281,7 +297,7 @@ list.addEventListener('dragstart', (e) => {
     draggedElement = target;
     e.dataTransfer.setData('text/plain', getBookmarkId(target));
     e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => target.classList.add('dragging'), 0); // Avoid visual flicker
+    setTimeout(() => target.classList.add('dragging'), 0);
 });
 
 list.addEventListener('dragend', (e) => {
@@ -296,14 +312,12 @@ list.addEventListener('dragover', (e) => {
     e.preventDefault(); // Necessary to allow dropping
     const dropTarget = e.target.closest('.tile');
 
-    // Clear previous hover states
     document.querySelectorAll('.drag-over-folder').forEach(el => el.classList.remove('drag-over-folder'));
 
     if (!dropTarget || !draggedElement || dropTarget === draggedElement) return;
 
     dropTarget.classList.add('drag-over');
 
-    // Highlight folder if it's a valid drop target (not itself or a descendant)
     if (isFolder(dropTarget) && getBookmarkId(dropTarget) !== getBookmarkId(draggedElement)) {
         dropTarget.classList.add('drag-over-folder');
     }
@@ -311,7 +325,6 @@ list.addEventListener('dragover', (e) => {
 
 list.addEventListener('dragleave', (e) => {
     const target = e.target.closest('.tile');
-    // Only remove class if the mouse leaves the element for good
     if (target && !target.contains(e.relatedTarget)) {
         target.classList.remove('drag-over', 'drag-over-folder');
     }
@@ -325,7 +338,10 @@ list.addEventListener('drop', (e) => {
     const draggedId = e.dataTransfer.getData('text/plain');
     if (!draggedId || !draggedElement) return;
 
-    const moveInfo = { parentId: undefined, index: undefined };
+    const moveInfo = {
+        parentId: undefined,
+        index: undefined
+    };
 
     if (dropTarget && dropTarget !== draggedElement) {
         const targetId = getBookmarkId(dropTarget);
