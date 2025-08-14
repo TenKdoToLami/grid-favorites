@@ -235,7 +235,7 @@ function closeFolder(folderEl) {
 document.addEventListener('DOMContentLoaded', refreshBookmarksList);
 
 
-document.getElementById('favorites-list').addEventListener('mousedown', (e) => {
+document.getElementById('favorites-list').addEventListener('mouseup', (e) => {
     const tile = e.target.closest('.tile');
     if (!tile || draggedElement) return;
 
