@@ -396,14 +396,8 @@ list.addEventListener('drop', (e) => {
         else {
             moveInfo.parentId = dropTarget.dataset.parentFolderId || BOOKMARKS_BAR_ID;
             const siblings = [...dropTarget.parentElement.children].filter(c => c.tagName === 'LI' && c !== draggedElement);
-            let targetIndex = siblings.indexOf(dropTarget);
-
-            // Adjust index based on drop position (top half vs. bottom half of target)
-            const rect = dropTarget.getBoundingClientRect();
-            if (e.clientY > rect.top + rect.height / 2) {
-                targetIndex++;
-            }
-            moveInfo.index = targetIndex;
+            // The dropped item should be placed at the index of the target
+            moveInfo.index = siblings.indexOf(dropTarget);
         }
     } else if (!dropTarget) {
         // Case 3: Drop on empty space (append to that list)
