@@ -1,0 +1,17 @@
+{
+	"manifest_version": 3,
+	"name": "Favorite Bookmarks in Grid",
+	"version": "1.0",
+	"description": "Shows bookmarks from the Bookmarks Bar in a grid.",
+	"permissions": [
+		"bookmarks"
+	],
+	"action": {
+		"default_popup": "popup.html",
+		"default_icon": {
+			"16": "assets/icon.png",
+			"48": "assets/icon.png",
+			"128": "assets/icon.png"
+		}
+	}
+}
