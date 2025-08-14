@@ -6,6 +6,7 @@ const DEFAULT_ICON_URL = 'assets/default-icon.png';
 const NESTED_FOLDER_COLORS = ['#ffadad', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#a0c4ff', '#bdb2ff', '#ffc6ff'];
 
 let draggedElement = null; // The DOM element being dragged.
+let focusedElementId = null; // Track the ID of the element at the top of the viewport
 
 // --- Helper Functions ---
 const getBookmarkId = (element) => element?.dataset.id || null;
@@ -128,17 +129,49 @@ function displayBookmarks(bookmarkNodes, container) {
 }
 
 /**
+ * Finds the topmost visible item and returns its ID.
+ * @returns {string | null} The ID of the topmost visible item.
+ */
+function getTopmostVisibleItemId() {
+    const list = document.getElementById("favorites-list");
+    const body = document.body;
+    if (!list || !body) return null;
+
+    const tiles = list.querySelectorAll('.tile');
+    for (const tile of tiles) {
+        const rect = tile.getBoundingClientRect();
+        if (rect.top >= 0 && rect.top <= body.clientHeight) {
+            return tile.dataset.id;
+        }
+    }
+    return null;
+}
+
+/**
  * Fetches bookmarks and repopulates the entire list.
  */
 async function refreshBookmarksList() {
     const list = document.getElementById("favorites-list");
-    if (!list) return;
+    const body = document.body;
+    if (!list || !body) return;
+
+    // Capture the ID of the topmost item before the refresh
+    const lastFocusedId = getTopmostVisibleItemId() || focusedElementId;
+    focusedElementId = null;
 
     list.innerHTML = ''; // Clear old content
     try {
         const bookmarkTree = await chrome.bookmarks.getTree();
         const bookmarksBar = bookmarkTree[0]?.children?.find(node => node.id === BOOKMARKS_BAR_ID);
         displayBookmarks(bookmarksBar?.children, list);
+
+        // After the list is repopulated, scroll to the last focused item
+        if (lastFocusedId) {
+            const lastFocusedElement = document.querySelector(`.tile[data-id='${lastFocusedId}']`);
+            if (lastFocusedElement) {
+                lastFocusedElement.scrollIntoView({ block: 'start' });
+            }
+        }
     } catch (error) {
         console.error("Error loading bookmarks:", error);
         list.textContent = "Error loading bookmarks.";
@@ -214,6 +247,7 @@ document.getElementById('favorites-list').addEventListener('mousedown', (e) => {
         const isFolderType = e.target.closest('[data-is-folder]').dataset.isFolder === 'true';
         const title = tile._itemData.title || (isFolderType ? 'folder' : 'bookmark');
 
+        focusedElementId = getTopmostVisibleItemId();
         if (confirm(`Delete "${title}"?${isFolderType ? '\n(Folder and all contents will be removed!)' : ''}`)) {
             const removeAction = isFolderType ? chrome.bookmarks.removeTree : chrome.bookmarks.remove;
             removeAction(id, () => {
@@ -252,7 +286,9 @@ document.getElementById('favorites-list').addEventListener('mousedown', (e) => {
         }
     }
 });
+
 document.getElementById('add-bookmark-btn').addEventListener('click', () => {
+    focusedElementId = getTopmostVisibleItemId();
     const url = prompt("Enter bookmark URL:", "https://");
     if (!url || url.trim() === "https://") return;
     const title = prompt("Enter bookmark title (optional):", "");
@@ -269,6 +305,7 @@ document.getElementById('add-bookmark-btn').addEventListener('click', () => {
 });
 
 document.getElementById('add-folder-btn').addEventListener('click', () => {
+    focusedElementId = getTopmostVisibleItemId();
     const title = prompt("Enter folder name:", "New Folder");
     if (!title) {
         if (title === "") alert("Folder name cannot be empty.");
@@ -285,6 +322,7 @@ document.getElementById('add-folder-btn').addEventListener('click', () => {
 });
 
 
+// --- Drag & Drop Handlers ---
 
 const list = document.getElementById('favorites-list');
 
@@ -297,7 +335,7 @@ list.addEventListener('dragstart', (e) => {
     draggedElement = target;
     e.dataTransfer.setData('text/plain', getBookmarkId(target));
     e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => target.classList.add('dragging'), 0);
+    setTimeout(() => target.classList.add('dragging'), 0); // Avoid visual flicker
 });
 
 list.addEventListener('dragend', (e) => {
@@ -312,12 +350,14 @@ list.addEventListener('dragover', (e) => {
     e.preventDefault(); // Necessary to allow dropping
     const dropTarget = e.target.closest('.tile');
 
+    // Clear previous hover states
     document.querySelectorAll('.drag-over-folder').forEach(el => el.classList.remove('drag-over-folder'));
 
     if (!dropTarget || !draggedElement || dropTarget === draggedElement) return;
 
     dropTarget.classList.add('drag-over');
 
+    // Highlight folder if it's a valid drop target (not itself or a descendant)
     if (isFolder(dropTarget) && getBookmarkId(dropTarget) !== getBookmarkId(draggedElement)) {
         dropTarget.classList.add('drag-over-folder');
     }
@@ -325,6 +365,7 @@ list.addEventListener('dragover', (e) => {
 
 list.addEventListener('dragleave', (e) => {
     const target = e.target.closest('.tile');
+    // Only remove class if the mouse leaves the element for good
     if (target && !target.contains(e.relatedTarget)) {
         target.classList.remove('drag-over', 'drag-over-folder');
     }
@@ -375,7 +416,7 @@ list.addEventListener('drop', (e) => {
         if (chrome.runtime.lastError) {
             console.error(`Bookmark move error: ${chrome.runtime.lastError.message}`);
         }
-        // Always refresh to ensure the UI is in sync with the bookmarks backend
+        focusedElementId = getTopmostVisibleItemId();
         refreshBookmarksList();
     });
 });
