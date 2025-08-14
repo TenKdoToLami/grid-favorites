@@ -8,10 +8,11 @@
 
 ## Demo
 
-*(Replace these with screenshots in `assets/` and link them here.)*
+![Example 1](assets/example-1.png)
+![Example 2](assets/example-2.png)
+![Example 3](assets/example-3.png)
+![Example 4](assets/example-4.gif)
 
-- `assets/screenshot-1.png` —
-- `assets/screenshot-2.png` —
 
 ## Features
 
