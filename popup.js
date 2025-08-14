@@ -335,6 +335,7 @@ list.addEventListener('dragstart', (e) => {
     draggedElement = target;
     e.dataTransfer.setData('text/plain', getBookmarkId(target));
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setDragImage(draggedElement, draggedElement.offsetWidth / 2, draggedElement.offsetHeight / 2);
     setTimeout(() => target.classList.add('dragging'), 0); // Avoid visual flicker
 });
 

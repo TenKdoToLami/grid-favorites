@@ -146,10 +146,6 @@ body {
     color: #eee;
 }
 
-.collapse-tile.nested-collapse {
-    border-width: 2px;
-}
-
 .collapse-icon {
     font-size: 18px;
     color: #aaa;
@@ -161,7 +157,12 @@ body {
 }
 
 .tile.drag-over {
-    background-color: rgba(255, 255, 255, 0.18);
+    background-color: transparent;
+    box-shadow: none;
+}
+
+.tile.drag-over-top {
+    box-shadow: 0 -2px 0 0 red;
 }
 
 .tile.folder.drag-over-folder {
@@ -171,7 +172,7 @@ body {
 }
 
 .drag-placeholder {
-    visibility: hidden; /* Hide the placeholder itself */
+    visibility: hidden;
     opacity: 0;
 }
 
